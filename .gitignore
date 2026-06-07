@@ -1,0 +1,29 @@
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Streamlit
+.streamlit/
+
+# Virtual environments
+venv/
+env/
+.venv/
+
+# Mac files
+.DS_Store
+
+# Logs
+*.log
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# VSCode settings (opcional)
+.vscode/
+
+# Distribution / build
+build/
+dist/
+*.egg-info/
