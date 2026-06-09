@@ -35,8 +35,7 @@ def run_mapreduce():
 
     archivos = glob.glob("data/*.csv")
 
-    with Pool(processes=5) as pool:
-        maps = pool.map(mapper, archivos)
+    maps = list(map(mapper, archivos))
 
     resultado = reducer(maps)
 
