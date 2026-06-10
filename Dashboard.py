@@ -13,7 +13,7 @@ st.title("🛡️ Cybersecurity Threat Detection")
 def load_data():
     return run_mapreduce()
 
-@st.cache_resource                    #nuevo           
+@st.cache_resource           
 def load_nns():                                   
     return cargar_nns()  
 
@@ -21,7 +21,11 @@ if st.button("🔄 Ejecutar MapReduce"):
     st.cache_data.clear()  # fuerza recarga
     st.rerun()
 
-ranking = load_data()
+ranking, total_fragmentos = load_data()
+
+st.info(
+    f"MapReduce ejecutado sobre {total_fragmentos} fragmentos usando procesamiento paralelo."
+)
 
 df = pd.DataFrame(
     ranking,
@@ -38,6 +42,8 @@ selected_categories = st.sidebar.multiselect(
 
 filtered_df = df[df["IP Category"].isin(selected_categories)]
 
+#Panel 1
+st.subheader("📊 Panel 1 — MapReduce Profiling")
 st.metric(
     label="📊 Total categorías",
     value=len(filtered_df)
@@ -50,9 +56,12 @@ st.metric(
 
 st.subheader("📋 Ranking de categorías")
 
-st.dataframe(filtered_df, use_container_width=True)
+st.dataframe(
+    filtered_df,
+    use_container_width=True
+)
 
-st.subheader("📈 Visualización")
+st.subheader("📈 Volumen outbound por categoría")
 
 st.bar_chart(
     filtered_df.set_index("IP Category")
