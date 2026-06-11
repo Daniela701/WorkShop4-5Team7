@@ -96,7 +96,7 @@ if ip_elegida:
 st.divider()
 
 # ── Panel 3 — Threat Neighborhood Analysis ──────────────────────────────────
-st.subheader("🧠 Panel 3 — Threat Neighborhood Analysis")
+st.subheader(" Panel 3 — Threat Neighborhood Analysis")
 st.markdown(
     """
     **Pregunta creativa:** Cuando se consulta un IP de alta severidad,
