@@ -91,4 +91,132 @@ if ip_elegida:
  
     vecinos = buscar_vecinos(ip_elegida, lista_ips, matriz, indice, k=5)  
     st.dataframe(vecinos, use_container_width=True)           
-    st.bar_chart(vecinos.set_index("IP Vecino")["Similitud Coseno"])      
+    st.bar_chart(vecinos.set_index("IP Vecino")["Similitud Coseno"])
+
+st.divider()
+
+# ── Panel 3 — Threat Neighborhood Analysis ──────────────────────────────────
+st.subheader("🧠 Panel 3 — Threat Neighborhood Analysis")
+st.markdown(
+    """
+    **Pregunta creativa:** Cuando se consulta un IP de alta severidad,
+    ¿sus 5 vecinos más cercanos también presentan `avg_severity` elevada?
+    ¿Existe un *"vecindario de amenaza"* compacto en el espacio conductual,
+    o los IPs peligrosos se dispersan entre el resto del tráfico?
+    """
+)
+
+UMBRAL_SEVERIDAD = st.slider(
+    "Umbral de alta severidad (avg_severity ≥)",
+    min_value=1.0, max_value=5.0, value=3.5, step=0.1
+)
+
+# ── 1. Identificar IPs de alta severidad ────────────────────────────────────
+lista_ips_p3, matriz_p3, indice_p3, df_features_p3 = load_nns()
+
+ips_alta_sev = [
+    ip for ip in lista_ips_p3
+    if df_features_p3.loc[ip, "severidad_avg"] >= UMBRAL_SEVERIDAD
+]
+
+st.info(
+    f"Se encontraron **{len(ips_alta_sev)}** IPs con `avg_severity` ≥ {UMBRAL_SEVERIDAD} "
+    f"de un total de **{len(lista_ips_p3)}** IPs únicos."
+)
+
+if len(ips_alta_sev) == 0:
+    st.warning("No hay IPs que superen el umbral definido. Reduce el valor del slider.")
+else:
+    # ── 2. Para cada IP amenazante → buscar 5 vecinos y medir su severidad ──
+    registros = []
+    for ip_amenaza in ips_alta_sev:
+        sev_query = df_features_p3.loc[ip_amenaza, "severidad_avg"]
+        try:
+            vecinos_df = buscar_vecinos(ip_amenaza, lista_ips_p3, matriz_p3, indice_p3, k=5)
+        except ValueError:
+            continue
+
+        sevs_vecinos = [
+            df_features_p3.loc[v, "severidad_avg"]
+            for v in vecinos_df["IP Vecino"]
+            if v in df_features_p3.index
+        ]
+        if not sevs_vecinos:
+            continue
+
+        avg_sev_vecinos = sum(sevs_vecinos) / len(sevs_vecinos)
+        vecinos_alta_sev = sum(1 for s in sevs_vecinos if s >= UMBRAL_SEVERIDAD)
+
+        registros.append({
+            "IP Amenaza"              : ip_amenaza,
+            "Severidad (query)"       : round(sev_query, 3),
+            "Severidad prom. vecinos" : round(avg_sev_vecinos, 3),
+            "Vecinos alta severidad"  : vecinos_alta_sev,
+            "Vecinos totales"         : len(sevs_vecinos),
+            "% vecinos amenaza"       : round(100 * vecinos_alta_sev / len(sevs_vecinos), 1),
+        })
+
+    df_panel3 = pd.DataFrame(registros)
+
+    # ── 3. Métricas globales ─────────────────────────────────────────────────
+    avg_sev_vecindario   = df_panel3["Severidad prom. vecinos"].mean()
+    pct_vecinos_amenaza  = df_panel3["% vecinos amenaza"].mean()
+    ips_cluster          = (df_panel3["Vecinos alta severidad"] >= 3).sum()
+
+    col1, col2, col3 = st.columns(3)
+    col1.metric(
+        "Severidad prom. del vecindario",
+        f"{avg_sev_vecindario:.2f}",
+        help="Promedio de avg_severity de los 5 vecinos de todos los IPs amenazantes"
+    )
+    col2.metric(
+        "% de vecinos también amenazantes",
+        f"{pct_vecinos_amenaza:.1f}%",
+        help="Porcentaje medio de vecinos que también superan el umbral de severidad"
+    )
+    col3.metric(
+        "IPs con cluster amenazante (≥3/5 vecinos)",
+        int(ips_cluster),
+        help="IPs cuyo vecindario es mayoritariamente de alta severidad"
+    )
+
+    # ── 4. Tabla detallada ───────────────────────────────────────────────────
+    st.subheader(" Detalle por IP amenazante")
+    st.dataframe(
+        df_panel3.sort_values("Severidad prom. vecinos", ascending=False),
+        use_container_width=True
+    )
+
+    # ── 5. Gráfico: distribución de severidad promedio del vecindario ────────
+    st.subheader(" Distribución de severidad promedio del vecindario")
+    hist_data = df_panel3["Severidad prom. vecinos"].value_counts(bins=10).sort_index()
+    st.bar_chart(hist_data)
+
+    # ── 6. Gráfico: % de vecinos amenazantes ────────────────────────────────
+    st.subheader(" ¿Cuántos vecinos también son amenazantes?")
+    conteo_vecinos = (
+        df_panel3["Vecinos alta severidad"]
+        .value_counts()
+        .sort_index()
+        .rename(index={0:"0/5", 1:"1/5", 2:"2/5", 3:"3/5", 4:"4/5", 5:"5/5"})
+    )
+    st.bar_chart(conteo_vecinos)
+
+    # ── 7. Conclusión ─────────────────────────────────────────────
+    st.subheader(" Conclusión")
+    if pct_vecinos_amenaza >= 50:
+        st.success(
+            f" **Sí existe un vecindario de amenaza compacto.**  \n"
+            f"En promedio, el **{pct_vecinos_amenaza:.1f}%** de los vecinos "
+            f"de un IP peligroso también son de alta severidad. "
+            f"Los IPs amenazantes tienden a agruparse en el espacio conductual, "
+            f"lo que sugiere que el modelo k-NN es útil para detectar amenazas por proximidad."
+        )
+    else:
+        st.warning(
+            f" **Los IPs peligrosos se dispersan en el espacio conductual.**  \n"
+            f"Solo el **{pct_vecinos_amenaza:.1f}%** de sus vecinos son también amenazantes. "
+            f"Esto indica que la severidad alta no se correlaciona fuertemente con el "
+            f"patrón de tráfico (protocolos, volumen), y que el k-NN por sí solo puede "
+            f"no ser suficiente para aislar amenazas — se requieren features adicionales."
+        )
