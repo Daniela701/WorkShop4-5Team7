@@ -58,7 +58,7 @@ st.metric(
 st.subheader("📋 Ranking de categorías")
 st.dataframe(
     filtered_df,
-    width="stretch"
+    use_container_width=True
 )
 
 st.subheader("📈 Volumen outbound por categoría")
@@ -96,7 +96,7 @@ if ip_elegida:
 
     # Ahora recibe df_features como parámetro adicional
     vecinos = buscar_vecinos(ip_elegida, lista_ips, matriz, indice, df_features, k=5)
-    st.dataframe(vecinos, width="stretch")
+    st.dataframe(vecinos, use_container_width=True)
     st.bar_chart(vecinos.set_index("IP Vecino")["Distancia"])
     
     st.divider()
